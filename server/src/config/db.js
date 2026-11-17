@@ -1,9 +1,9 @@
-const mongoose = require('mongoose');
-require('dotenv').config();
+import mongoose from 'mongoose';
+import dns from 'dns';
+import 'dotenv/config';
 
 // Custom DNS setting fallback for environments with DNS resolution issues (e.g. Atlas SRV lookups)
 try {
-    const dns = require('dns');
     if (typeof dns.setDefaultResultOrder === 'function') {
         dns.setDefaultResultOrder('ipv4first');
     }
@@ -44,4 +44,5 @@ mongoose.connection.on('reconnected', () => {
     console.log('[DB] Mongoose reconnected to MongoDB');
 });
 
-module.exports = connectDb;
+export { connectDb };
+export default connectDb;

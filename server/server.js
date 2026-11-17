@@ -1,6 +1,6 @@
-require('dotenv').config();
-const app = require('./src/app');
-const connectDb = require('./src/config/db');
+import 'dotenv/config';
+import app from './src/app.js';
+import connectDb from './src/config/db.js';
 
 const PORT = process.env.PORT || 8080;
 
@@ -16,3 +16,7 @@ connectDb()
         console.error('[Startup Error] Database connection failed:', error.message);
         process.exitCode = 1;
     });
+
+export default server;
+
+

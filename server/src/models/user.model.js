@@ -1,6 +1,6 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
-const userSchema = new mongoose.Schema({
+export const userSchema = new mongoose.Schema({
     name: {
         type: String,
         trim: true
@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema({
     },
     email: {
         type: String,
-        required: true,
+        required: [true, 'Email is required'],
         unique: true,
         trim: true,
         lowercase: true,
@@ -21,7 +21,7 @@ const userSchema = new mongoose.Schema({
     },
     passWord: {
         type: String,
-        required: true
+        required: [true, 'Password is required']
     },
     role: {
         type: String,
@@ -34,10 +34,24 @@ const userSchema = new mongoose.Schema({
     }],
     assignedClassIds: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'ClassGroup'
-    }]
+        ref: 'Class'
+    }],
+    studentId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Student'
+    }
 }, {
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+});
+
+// Virtual populate for linked Student record
+userSchema.virtual('studentProfile', {
+    ref: 'Student',
+    localField: '_id',
+    foreignField: 'userId',
+    justOne: true
 });
 
 // Sync name and userName if one is missing
@@ -48,7 +62,7 @@ userSchema.pre('save', function (next) {
     if (!this.userName && this.name) {
         this.userName = this.name.toLowerCase().replace(/\s+/g, '_');
     }
-    if (typeof next === 'function') next();
+    if (typeof next === 'function') return next();
 });
 
 // Virtual for passwordHash to match instruction specs
@@ -58,6 +72,6 @@ userSchema.virtual('passwordHash').get(function () {
     this.passWord = val;
 });
 
-const userModel = mongoose.model('User', userSchema);
+export const userModel = mongoose.models.User || mongoose.model('User', userSchema);
 
-module.exports = userModel;
+export default userModel;

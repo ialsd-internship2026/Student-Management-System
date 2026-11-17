@@ -1,10 +1,15 @@
-const express = require('express');
-const cookieParser = require('cookie-parser');
-const cors = require('cors');
-const helmet = require('helmet');
-const mongoose = require('mongoose');
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import helmet from 'helmet';
+import mongoose from 'mongoose';
 
-const authRoutes = require('./routes/auth.routes');
+import authRoutes from './routes/auth.routes.js';
+import studentRoutes from './routes/student.routes.js';
+import userRoutes from './routes/user.routes.js';
+import teacherRoutes from './routes/teacher.routes.js';
+import classRoutes from './routes/class.routes.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
 
 const app = express();
 
@@ -59,6 +64,11 @@ app.get('/api/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/students', studentRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/teachers', teacherRoutes);
+app.use('/api/classes', classRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Catch-all for undefined routes
 app.use((req, res) => {
@@ -74,4 +84,4 @@ app.use((err, req, res, next) => {
     });
 });
 
-module.exports = app;
+export default app;

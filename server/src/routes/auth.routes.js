@@ -1,14 +1,14 @@
-const express = require('express');
-const authController = require('../controllers/auth.contoller');
-const { validationRules } = require('../middlewares/validate.middleware');
-const { authUser } = require('../middlewares/auth.middleware');
+import express from 'express';
+import { register, login, logout, getMe } from '../controllers/auth.controller.js';
+import { validationRules } from '../middlewares/validate.middleware.js';
+import { authUser } from '../middlewares/auth.middleware.js';
 
-const route = express.Router();
+const router = express.Router();
 
-route.post('/register', validationRules, authController.registerUser);
-route.post('/login', authController.loginUser);
-route.post('/loginuser', authController.loginUser); // backward compatibility
-route.post('/logout', authController.logoutUser);
-route.get('/me', authUser, authController.getMe);
+router.post('/register', validationRules, register);
+router.post('/login', login);
+router.post('/loginuser', login); // backward compatibility
+router.post('/logout', logout);
+router.get('/me', authUser, getMe);
 
-module.exports = route;
+export default router;

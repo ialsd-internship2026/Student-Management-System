@@ -1,7 +1,7 @@
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
+import jwt from 'jsonwebtoken';
+import 'dotenv/config';
 
-const getTokenFromRequest = (req) => {
+export const getTokenFromRequest = (req) => {
     if (req.cookies && req.cookies.token) {
         return req.cookies.token;
     }
@@ -11,7 +11,7 @@ const getTokenFromRequest = (req) => {
     return null;
 };
 
-const optionalAuth = (req, res, next) => {
+export const optionalAuth = (req, res, next) => {
     const token = getTokenFromRequest(req);
     if (!token) return next();
 
@@ -27,7 +27,7 @@ const optionalAuth = (req, res, next) => {
     }
 };
 
-const authAdmin = async (req, res, next) => {
+export const authAdmin = async (req, res, next) => {
     try {
         const token = getTokenFromRequest(req);
         if (!token) {
@@ -41,7 +41,7 @@ const authAdmin = async (req, res, next) => {
         }
 
         req.user = decoded;
-        next();
+        return next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
             return res.status(401).json({ message: "Session expired. Please log in again." });
@@ -50,7 +50,7 @@ const authAdmin = async (req, res, next) => {
     }
 };
 
-const authUser = async (req, res, next) => {
+export const authUser = async (req, res, next) => {
     try {
         const token = getTokenFromRequest(req);
         if (!token) {
@@ -60,7 +60,7 @@ const authUser = async (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_PRIVATE || "default_jwt_secret");
 
         req.user = decoded;
-        next();
+        return next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
             return res.status(401).json({ message: "Session expired. Please log in again." });
@@ -69,8 +69,9 @@ const authUser = async (req, res, next) => {
     }
 };
 
-module.exports = {
+export default {
     authAdmin,
     authUser,
-    optionalAuth
+    optionalAuth,
+    getTokenFromRequest
 };

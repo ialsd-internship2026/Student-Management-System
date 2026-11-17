@@ -1,21 +1,25 @@
-const userModel = require('../models/user.model');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-require('dotenv').config();
+import userModel from '../models/user.model.js';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import 'dotenv/config';
 
 const isSecure = process.env.NODE_ENV === 'production' && process.env.COOKIE_SECURE === 'true';
 
-const COOKIE_OPTIONS = {
+export const COOKIE_OPTIONS = {
     httpOnly: true,
     secure: isSecure,
     sameSite: isSecure ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
 };
 
-const registerUser = async (req, res) => {
+export const register = async (req, res) => {
     try {
         const { userName, name, email, passWord, password, role, subjects, assignedClassIds } = req.body;
         const finalPassword = passWord || password;
+
+        if (!email) {
+            return res.status(400).json({ message: "Email is required." });
+        }
 
         if (!finalPassword) {
             return res.status(400).json({ message: "Password is required." });
@@ -23,8 +27,8 @@ const registerUser = async (req, res) => {
 
         const isUserExist = await userModel.findOne({
             $or: [
-                ...(userName ? [{ userName }] : []),
-                ...(email ? [{ email }] : [])
+                ...(userName ? [{ userName: userName.trim() }] : []),
+                { email: email.trim().toLowerCase() }
             ]
         });
 
@@ -37,9 +41,9 @@ const registerUser = async (req, res) => {
         const hash = await bcrypt.hash(finalPassword, 10);
 
         const user = await userModel.create({
-            userName: userName || (name ? name.toLowerCase().replace(/\s+/g, '_') : undefined),
-            name: name || userName,
-            email,
+            userName: userName ? userName.trim() : (name ? name.toLowerCase().replace(/\s+/g, '_') : undefined),
+            name: name ? name.trim() : userName,
+            email: email.trim().toLowerCase(),
             passWord: hash,
             role: role || 'teacher',
             subjects: subjects || [],
@@ -68,7 +72,7 @@ const registerUser = async (req, res) => {
             assignedClassIds: user.assignedClassIds
         };
 
-        res.status(201).json({
+        return res.status(201).json({
             message: "User registered successfully",
             user: userResponse,
             token
@@ -79,20 +83,20 @@ const registerUser = async (req, res) => {
         if (error.code === 11000) {
             return res.status(409).json({ message: "User account details already exist." });
         }
-        res.status(500).json({
+        return res.status(500).json({
             message: error.message || "Internal server error"
         });
     }
 };
 
-const loginUser = async (req, res) => {
+export const login = async (req, res) => {
     try {
         const { userName, email, passWord, password } = req.body;
         const finalPassword = passWord || password;
 
         const queryConditions = [];
-        if (userName) queryConditions.push({ userName });
-        if (email) queryConditions.push({ email });
+        if (userName) queryConditions.push({ userName: userName.trim() });
+        if (email) queryConditions.push({ email: email.trim().toLowerCase() });
 
         if (queryConditions.length === 0) {
             return res.status(400).json({ message: "Username or email is required." });
@@ -140,28 +144,28 @@ const loginUser = async (req, res) => {
             assignedClassIds: user.assignedClassIds || []
         };
 
-        res.status(200).json({
+        return res.status(200).json({
             message: "Login successful",
             user: userResponse,
-            isuserExist: userResponse, // maintain backward compatibility
+            isuserExist: userResponse,
             token
         });
 
     } catch (error) {
         console.error('[Auth Error] Login:', error);
-        res.status(500).json({
+        return res.status(500).json({
             message: "Internal server error",
             error: error.message
         });
     }
 };
 
-const logoutUser = async (req, res) => {
+export const logout = async (req, res) => {
     res.clearCookie("token", COOKIE_OPTIONS);
-    res.status(200).json({ message: 'Logged out successfully' });
+    return res.status(200).json({ message: 'Logged out successfully' });
 };
 
-const getMe = async (req, res) => {
+export const getMe = async (req, res) => {
     try {
         const user = await userModel.findById(req.user.id)
             .select('-passWord')
@@ -169,10 +173,23 @@ const getMe = async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
-        res.status(200).json({ user });
+        return res.status(200).json({ user });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return res.status(500).json({ message: error.message });
     }
 };
 
-module.exports = { registerUser, loginUser, logoutUser, getMe };
+// Backward-compatible named exports
+export const registerUser = register;
+export const loginUser = login;
+export const logoutUser = logout;
+
+export default {
+    register,
+    login,
+    logout,
+    getMe,
+    registerUser,
+    loginUser,
+    logoutUser
+};
