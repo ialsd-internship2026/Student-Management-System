@@ -18,11 +18,11 @@ app.use(helmet({
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
-        
-        const envOrigins = process.env.CORS_ORIGIN 
-            ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) 
+
+        const envOrigins = process.env.CORS_ORIGIN
+            ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
             : [];
-            
+
         if (
             envOrigins.includes(origin) ||
             process.env.NODE_ENV !== 'production' ||
@@ -47,7 +47,7 @@ app.use(cookieParser());
 app.get('/api/health', (req, res) => {
     const dbState = mongoose.connection.readyState;
     const dbStatusMap = { 0: 'Disconnected', 1: 'Connected', 2: 'Connecting', 3: 'Disconnecting' };
-    
+
     res.status(200).json({
         status: 'OK',
         appName: 'Student Management System API',
