@@ -5,12 +5,14 @@ export const userSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+
     userName: {
         type: String,
         unique: true,
         sparse: true,
         trim: true
     },
+
     email: {
         type: String,
         required: [true, 'Email is required'],
@@ -19,27 +21,46 @@ export const userSchema = new mongoose.Schema({
         lowercase: true,
         index: true
     },
+
     passWord: {
         type: String,
         required: [true, 'Password is required']
     },
+
     role: {
         type: String,
         enum: ['teacher', 'admin', 'student'],
         default: 'student'
     },
+
     subjects: [{
         type: String,
         trim: true
     }],
+
     assignedClassIds: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'ClassGroup'
     }],
+
+    // Student Information
     studentId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Student'
+    },
+
+    // Admin Information
+    about: {
+        type: String,
+        default: '',
+        trim: true
+    },
+
+    profileImage: {
+        type: String,
+        default: ''
     }
+
 }, {
     timestamps: true,
     toJSON: { virtuals: true },
@@ -50,9 +71,11 @@ userSchema.pre('save', function (next) {
     if (!this.name && this.userName) {
         this.name = this.userName;
     }
+
     if (!this.userName && this.name) {
         this.userName = this.name.toLowerCase().replace(/\s+/g, '_');
     }
+
     if (typeof next === 'function') return next();
 });
 
@@ -62,5 +85,7 @@ userSchema.virtual('passwordHash').get(function () {
     this.passWord = val;
 });
 
-export const userModel = mongoose.models.User || mongoose.model('User', userSchema);
+export const userModel = mongoose.models.User ||
+    mongoose.model('User', userSchema);
+
 export default userModel;

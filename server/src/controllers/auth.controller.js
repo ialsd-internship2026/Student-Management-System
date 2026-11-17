@@ -15,7 +15,7 @@ export const COOKIE_OPTIONS = {
 
 export const register = async (req, res) => {
     try {
-        const { userName, name, email, passWord, password, role, subjects, assignedClassIds, studentId } = req.body;
+const { userName, name, email, passWord, password, subjects, assignedClassIds, studentId } = req.body;
         const finalPassword = passWord || password;
 
         if (!email) {
@@ -46,7 +46,7 @@ export const register = async (req, res) => {
             name: name ? name.trim() : userName,
             email: email.trim().toLowerCase(),
             passWord: hash,
-            role: role || 'teacher',
+            role: 'teacher',
             subjects: subjects || [],
             assignedClassIds: assignedClassIds || [],
             studentId: studentId || undefined
