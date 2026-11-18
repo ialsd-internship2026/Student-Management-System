@@ -25,8 +25,8 @@ export const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['teacher', 'admin', 'student', 'user'],
-        default: 'teacher'
+        enum: ['teacher', 'admin', 'student'],
+        default: 'student'
     },
     subjects: [{
         type: String,
@@ -34,7 +34,7 @@ export const userSchema = new mongoose.Schema({
     }],
     assignedClassIds: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Class'
+        ref: 'ClassGroup'
     }],
     studentId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -46,15 +46,6 @@ export const userSchema = new mongoose.Schema({
     toObject: { virtuals: true }
 });
 
-// Virtual populate for linked Student record
-userSchema.virtual('studentProfile', {
-    ref: 'Student',
-    localField: '_id',
-    foreignField: 'userId',
-    justOne: true
-});
-
-// Sync name and userName if one is missing
 userSchema.pre('save', function (next) {
     if (!this.name && this.userName) {
         this.name = this.userName;
@@ -65,7 +56,6 @@ userSchema.pre('save', function (next) {
     if (typeof next === 'function') return next();
 });
 
-// Virtual for passwordHash to match instruction specs
 userSchema.virtual('passwordHash').get(function () {
     return this.passWord;
 }).set(function (val) {
@@ -73,5 +63,4 @@ userSchema.virtual('passwordHash').get(function () {
 });
 
 export const userModel = mongoose.models.User || mongoose.model('User', userSchema);
-
 export default userModel;

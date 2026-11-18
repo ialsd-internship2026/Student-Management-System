@@ -1,4 +1,5 @@
 import userModel from '../models/user.model.js';
+import studentModel from '../models/student.model.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import 'dotenv/config';
@@ -14,7 +15,7 @@ export const COOKIE_OPTIONS = {
 
 export const register = async (req, res) => {
     try {
-        const { userName, name, email, passWord, password, role, subjects, assignedClassIds } = req.body;
+        const { userName, name, email, passWord, password, role, subjects, assignedClassIds, studentId } = req.body;
         const finalPassword = passWord || password;
 
         if (!email) {
@@ -47,14 +48,16 @@ export const register = async (req, res) => {
             passWord: hash,
             role: role || 'teacher',
             subjects: subjects || [],
-            assignedClassIds: assignedClassIds || []
+            assignedClassIds: assignedClassIds || [],
+            studentId: studentId || undefined
         });
 
         const token = jwt.sign(
             {
                 id: user._id,
                 role: user.role,
-                assignedClassIds: user.assignedClassIds || []
+                assignedClassIds: user.assignedClassIds || [],
+                studentId: user.studentId || null
             },
             process.env.JWT_PRIVATE || "default_jwt_secret",
             { expiresIn: '7d' }
@@ -69,7 +72,8 @@ export const register = async (req, res) => {
             email: user.email,
             role: user.role,
             subjects: user.subjects,
-            assignedClassIds: user.assignedClassIds
+            assignedClassIds: user.assignedClassIds,
+            studentId: user.studentId
         };
 
         return res.status(201).json({
@@ -122,11 +126,23 @@ export const login = async (req, res) => {
             });
         }
 
+        // If student role, ensure studentId is resolved
+        let studentId = user.studentId;
+        if (user.role === 'student' && !studentId) {
+            const student = await studentModel.findOne({ userId: user._id });
+            if (student) {
+                user.studentId = student._id;
+                await user.save();
+                studentId = student._id;
+            }
+        }
+
         const token = jwt.sign(
             {
                 id: user._id,
                 role: user.role,
-                assignedClassIds: user.assignedClassIds || []
+                assignedClassIds: user.assignedClassIds || [],
+                studentId: studentId || null
             },
             process.env.JWT_PRIVATE || "default_jwt_secret",
             { expiresIn: '7d' }
@@ -141,7 +157,8 @@ export const login = async (req, res) => {
             email: user.email,
             role: user.role,
             subjects: user.subjects || [],
-            assignedClassIds: user.assignedClassIds || []
+            assignedClassIds: user.assignedClassIds || [],
+            studentId: studentId || null
         };
 
         return res.status(200).json({
@@ -167,9 +184,10 @@ export const logout = async (req, res) => {
 
 export const getMe = async (req, res) => {
     try {
-        const user = await userModel.findById(req.user.id)
+        const user = await userModel.findById(req.user.id || req.user._id)
             .select('-passWord')
-            .populate('assignedClassIds', 'name term');
+            .populate('assignedClassIds', 'name term')
+            .populate('studentId', 'name studentCode classId');
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
@@ -179,7 +197,6 @@ export const getMe = async (req, res) => {
     }
 };
 
-// Backward-compatible named exports
 export const registerUser = register;
 export const loginUser = login;
 export const logoutUser = logout;

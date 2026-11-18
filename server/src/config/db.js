@@ -1,6 +1,12 @@
 import mongoose from 'mongoose';
 import dns from 'dns';
-import 'dotenv/config';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // Custom DNS setting fallback for environments with DNS resolution issues (e.g. Atlas SRV lookups)
 try {

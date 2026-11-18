@@ -5,21 +5,18 @@ import helmet from 'helmet';
 import mongoose from 'mongoose';
 
 import authRoutes from './routes/auth.routes.js';
-import studentRoutes from './routes/student.routes.js';
-import userRoutes from './routes/user.routes.js';
 import teacherRoutes from './routes/teacher.routes.js';
-import classRoutes from './routes/class.routes.js';
-import dashboardRoutes from './routes/dashboard.routes.js';
+import studentRoutes from './routes/student.routes.js';
 
 const app = express();
 
-// Security Headers with cross-origin media support
+// Security Headers
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// Dynamic CORS Origin Resolution
+// CORS Configuration
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
@@ -48,14 +45,14 @@ app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(cookieParser());
 
-// Health Check Endpoint for Deployment Probes (Render, Railway, Heroku, AWS)
+// Health Check Endpoint
 app.get('/api/health', (req, res) => {
     const dbState = mongoose.connection.readyState;
     const dbStatusMap = { 0: 'Disconnected', 1: 'Connected', 2: 'Connecting', 3: 'Disconnecting' };
 
     res.status(200).json({
         status: 'OK',
-        appName: 'Student Management System API',
+        appName: 'Aster Institute - Student Management System API',
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
         database: dbStatusMap[dbState] || 'Unknown'
@@ -64,11 +61,10 @@ app.get('/api/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/students', studentRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/teachers', teacherRoutes);
-app.use('/api/classes', classRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/teacher', teacherRoutes);
+app.use('/api/teachers', teacherRoutes); // alias
+app.use('/api/student', studentRoutes);
+app.use('/api/students', studentRoutes); // alias
 
 // Catch-all for undefined routes
 app.use((req, res) => {

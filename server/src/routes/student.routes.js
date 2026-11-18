@@ -1,32 +1,41 @@
 import express from 'express';
 import {
-    createStudent,
-    getAllStudents,
-    getStudentById,
-    updateStudent,
-    deleteStudent,
-    getStudentStats,
-    getStudentProfile,
-    bulkCreateStudents
+    getStudentOverview,
+    getStudentAttendance,
+    getStudentSchedule,
+    getStudentCourses,
+    getStudentCourseDetail,
+    getStudentResults,
+    getStudentAnnouncements,
+    getStudentResources,
+    exportStudentReport
 } from '../controllers/student.controller.js';
-import { authUser, optionalAuth } from '../middlewares/auth.middleware.js';
+import { authStudent } from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
-// Specific routes before param routes
-router.get('/stats', optionalAuth, getStudentStats);
-router.get('/me/profile', authUser, getStudentProfile);
-router.post('/bulk', optionalAuth, bulkCreateStudents);
+// Enforce student role and implicit JWT student scoping on all student routes
+router.use(authStudent);
 
-// Root collection routes
-router.route('/')
-    .get(optionalAuth, getAllStudents)
-    .post(optionalAuth, createStudent);
+// Student Overview / Dashboard
+router.get('/overview', getStudentOverview);
 
-// Individual student routes
-router.route('/:id')
-    .get(optionalAuth, getStudentById)
-    .put(optionalAuth, updateStudent)
-    .delete(optionalAuth, deleteStudent);
+// Attendance & Schedule
+router.get('/attendance', getStudentAttendance);
+router.get('/schedule', getStudentSchedule);
+
+// Courses & Content
+router.get('/courses', getStudentCourses);
+router.get('/courses/:id', getStudentCourseDetail);
+
+// Learning & Results
+router.get('/results', getStudentResults);
+
+// Announcements & Resources
+router.get('/announcements', getStudentAnnouncements);
+router.get('/resources', getStudentResources);
+
+// Report Export
+router.get('/report/export', exportStudentReport);
 
 export default router;
