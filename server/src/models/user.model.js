@@ -3,16 +3,9 @@ import mongoose from 'mongoose';
 export const userSchema = new mongoose.Schema({
     name: {
         type: String,
+        required: [true, 'Name is required'],
         trim: true
     },
-
-    userName: {
-        type: String,
-        unique: true,
-        sparse: true,
-        trim: true
-    },
-
     email: {
         type: String,
         required: [true, 'Email is required'],
@@ -21,71 +14,33 @@ export const userSchema = new mongoose.Schema({
         lowercase: true,
         index: true
     },
-
-    passWord: {
+    passwordHash: {
         type: String,
         required: [true, 'Password is required']
     },
-
     role: {
         type: String,
         enum: ['teacher', 'admin', 'student'],
-        default: 'student'
+        required: [true, 'Role is required'],
+        default: 'student',
+        index: true
     },
-
-    subjects: [{
-        type: String,
-        trim: true
-    }],
-
-    assignedClassIds: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'ClassGroup'
-    }],
-
-    // Student Information
-    studentId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Student'
-    },
-
-    // Admin Information
-    about: {
-        type: String,
-        default: '',
-        trim: true
-    },
-
-    profileImage: {
-        type: String,
-        default: ''
+    active: {
+        type: Boolean,
+        default: true
     }
-
 }, {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
 });
 
-userSchema.pre('save', function (next) {
-    if (!this.name && this.userName) {
-        this.name = this.userName;
-    }
-
-    if (!this.userName && this.name) {
-        this.userName = this.name.toLowerCase().replace(/\s+/g, '_');
-    }
-
-    if (typeof next === 'function') return next();
-});
-
-userSchema.virtual('passwordHash').get(function () {
-    return this.passWord;
+// Backward compatibility virtual for passWord field if previously saved
+userSchema.virtual('passWord').get(function () {
+    return this.passwordHash;
 }).set(function (val) {
-    this.passWord = val;
+    this.passwordHash = val;
 });
 
-export const userModel = mongoose.models.User ||
-    mongoose.model('User', userSchema);
-
+export const userModel = mongoose.models.User || mongoose.model('User', userSchema);
 export default userModel;

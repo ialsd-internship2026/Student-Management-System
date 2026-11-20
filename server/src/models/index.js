@@ -1,4 +1,6 @@
 import userModel, { userSchema } from './user.model.js';
+import teacherModel, { teacherSchema } from './teacher.model.js';
+import adminModel, { adminSchema } from './admin.model.js';
 import studentModel, { studentSchema } from './student.model.js';
 import classGroupModel, { classGroupSchema } from './classGroup.model.js';
 import attendanceRecordModel, { attendanceRecordSchema } from './attendanceRecord.model.js';
@@ -10,10 +12,16 @@ import enrollmentModel, { enrollmentSchema } from './enrollment.model.js';
 import announcementModel, { announcementSchema } from './announcement.model.js';
 import resourceModel, { resourceSchema } from './resource.model.js';
 import practiceActivityModel, { practiceActivitySchema } from './practiceActivity.model.js';
+import classSessionModel, { classSessionSchema } from './classSession.model.js';
+import notificationModel, { notificationSchema } from './notification.model.js';
 
 export {
     userModel,
     userSchema,
+    teacherModel,
+    teacherSchema,
+    adminModel,
+    adminSchema,
     studentModel,
     studentSchema,
     classGroupModel,
@@ -35,11 +43,17 @@ export {
     resourceModel,
     resourceSchema,
     practiceActivityModel,
-    practiceActivitySchema
+    practiceActivitySchema,
+    classSessionModel,
+    classSessionSchema,
+    notificationModel,
+    notificationSchema
 };
 
 export default {
     User: userModel,
+    Teacher: teacherModel,
+    Admin: adminModel,
     Student: studentModel,
     ClassGroup: classGroupModel,
     AttendanceRecord: attendanceRecordModel,
@@ -50,5 +64,7 @@ export default {
     Enrollment: enrollmentModel,
     Announcement: announcementModel,
     Resource: resourceModel,
-    PracticeActivity: practiceActivityModel
+    PracticeActivity: practiceActivityModel,
+    ClassSession: classSessionModel,
+    Notification: notificationModel
 };

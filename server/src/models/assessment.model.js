@@ -31,6 +31,18 @@ export const assessmentSchema = new mongoose.Schema({
         type: Date,
         required: true,
         default: Date.now
+    },
+    startTime: {
+        type: String,
+        trim: true
+    },
+    endTime: {
+        type: String,
+        trim: true
+    },
+    room: {
+        type: String,
+        trim: true
     }
 }, {
     timestamps: true

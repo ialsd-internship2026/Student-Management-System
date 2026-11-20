@@ -9,6 +9,7 @@ import Enrollment from '../models/enrollment.model.js';
 import Announcement from '../models/announcement.model.js';
 import Resource from '../models/resource.model.js';
 import PracticeActivity from '../models/practiceActivity.model.js';
+import ClassSession from '../models/classSession.model.js';
 import {
     calculateStudentAttendance,
     calculateStudentPerformance,
@@ -47,17 +48,37 @@ export const getStudentOverview = async (req, res) => {
         // 2. Attendance metrics (only submitted records, no notes)
         const attendance = await calculateStudentAttendance(studentId, student.classId);
 
-        // 3. Performance & Results
-        const performance = await calculateStudentPerformance(studentId);
-
-        // 4. Enrollments & Course Progress
+        // 3. Enrollments & Course Progress (filter out archived courses)
         const enrollments = await Enrollment.find({ studentId }).populate('courseId').lean();
-        const courseProgressList = enrollments.map(e => ({
+        const activeEnrollments = enrollments.filter(e => e.courseId && e.courseId.status !== 'archived');
+
+        const courseProgressList = activeEnrollments.map(e => ({
             courseId: e.courseId?._id,
             courseName: e.courseId?.name || "Course",
             courseCode: e.courseId?.code || "CODE",
-            progressPercent: e.progressPercent || 0
+            progressPercent: e.progressPercent || 0,
+            status: e.courseId?.status || 'active'
         }));
+
+        // Gating sets
+        const hiddenExamSubjects = new Set();
+        const hiddenGrowthSubjects = new Set();
+        activeEnrollments.forEach(e => {
+            const c = e.courseId;
+            if (c) {
+                if (c.studentElementsVisibility?.examResults === false) {
+                    hiddenExamSubjects.add(c.name.toLowerCase());
+                    hiddenExamSubjects.add(c.code.toLowerCase());
+                }
+                if (c.studentElementsVisibility?.growthPerformance === false) {
+                    hiddenGrowthSubjects.add(c.name.toLowerCase());
+                    hiddenGrowthSubjects.add(c.code.toLowerCase());
+                }
+            }
+        });
+
+        // 4. Performance & Results
+        const performance = await calculateStudentPerformance(studentId);
 
         // 5. Next Exam Milestone Banner
         const nextAssessment = await Assessment.findOne({
@@ -85,7 +106,7 @@ export const getStudentOverview = async (req, res) => {
         const statCards = {
             attendancePercent: attendance.attendanceRate,
             overallPerformancePercent: performance.overallScorePercent,
-            enrolledCoursesCount: enrollments.length,
+            enrolledCoursesCount: activeEnrollments.length,
             nextExam: nextAssessment ? {
                 date: nextAssessment.date,
                 subject: nextAssessment.subject,
@@ -101,6 +122,8 @@ export const getStudentOverview = async (req, res) => {
 
         const weeklyTrend = [];
         for (const a of assessments) {
+            if (hiddenGrowthSubjects.has(a.subject.toLowerCase())) continue;
+
             const classResults = await Result.find({ assessmentId: a._id }).lean();
             const studentResult = classResults.find(r => r.studentId.toString() === studentId.toString());
 
@@ -123,39 +146,58 @@ export const getStudentOverview = async (req, res) => {
             }
         }
 
-        // 7. Today's class sessions
-        const classGroup = await ClassGroup.findById(student.classId).lean();
-        const className = classGroup?.name || "Class";
+        // 7. Today's class sessions (query ClassSession if present, or timetable)
+        const startOfDay = new Date(now);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(now);
+        endOfDay.setHours(23, 59, 59, 999);
 
-        const todaySessions = [
-            {
-                time: "09:00 - 10:30 AM",
-                subject: "Mathematics",
-                topic: "Differential Calculus & Applications",
-                room: "Room 302",
-                status: "completed"
-            },
-            {
-                time: "11:00 - 12:30 PM",
-                subject: "Physics",
-                topic: "Thermodynamics and Heat Transfer",
-                room: "Lab B",
-                status: "upcoming"
-            },
-            {
-                time: "02:00 - 03:30 PM",
-                subject: "English Literature",
-                topic: "Modern Poetry Analysis",
-                room: "Room 105",
-                status: "upcoming"
-            }
-        ];
+        const realSessions = await ClassSession.find({
+            classId: student.classId,
+            date: { $gte: startOfDay, $lte: endOfDay },
+            status: { $ne: 'cancelled' }
+        }).populate('courseId', 'name code').lean();
+
+        let todaySessions = [];
+        if (realSessions.length > 0) {
+            todaySessions = realSessions.map(s => ({
+                time: `${s.startTime} - ${s.endTime}`,
+                subject: s.courseId?.name || s.topic || "Class Session",
+                topic: s.topic,
+                room: s.room,
+                status: s.status
+            }));
+        } else {
+            todaySessions = [
+                {
+                    time: "09:00 - 10:30 AM",
+                    subject: "Mathematics",
+                    topic: "Differential Calculus & Applications",
+                    room: "Room 302",
+                    status: "completed"
+                },
+                {
+                    time: "11:00 - 12:30 PM",
+                    subject: "Physics",
+                    topic: "Thermodynamics and Heat Transfer",
+                    room: "Lab B",
+                    status: "upcoming"
+                },
+                {
+                    time: "02:00 - 03:30 PM",
+                    subject: "English Literature",
+                    topic: "Modern Poetry Analysis",
+                    room: "Room 105",
+                    status: "upcoming"
+                }
+            ];
+        }
 
         const remainingSessionsCount = todaySessions.filter(s => s.status === 'upcoming').length;
 
-        // 8. Latest exam results summary (published only)
+        // 8. Latest exam results summary (published only & gated)
         const latestExamResults = performance.resultsList
-            .filter(r => r.status === 'published')
+            .filter(r => r.status === 'published' && !hiddenExamSubjects.has(r.subject.toLowerCase()))
             .slice(-4)
             .reverse();
 
@@ -195,6 +237,17 @@ export const getStudentAttendance = async (req, res) => {
         const studentId = student._id;
         const { from, to, page = 1, limit = 10 } = req.query;
 
+        // Check course visibility toggles for attendanceSchedule
+        const enrollments = await Enrollment.find({ studentId }).populate('courseId').lean();
+        const hiddenAttendanceSubjects = new Set();
+        enrollments.forEach(e => {
+            const c = e.courseId;
+            if (c && c.studentElementsVisibility?.attendanceSchedule === false) {
+                hiddenAttendanceSubjects.add(c.name.toLowerCase());
+                hiddenAttendanceSubjects.add(c.code.toLowerCase());
+            }
+        });
+
         // Fetch only submitted attendance records (security guarantee)
         const dateFilter = {};
         if (from) dateFilter.$gte = new Date(from);
@@ -221,6 +274,10 @@ export const getStudentAttendance = async (req, res) => {
         const courseMap = {};
 
         for (const record of submittedRecords) {
+            const subj = record.sessionSubject || 'General';
+            // If gated by attendanceSchedule toggle, omit
+            if (hiddenAttendanceSubjects.has(subj.toLowerCase())) continue;
+
             const entry = record.entries.find(e => e.studentId.toString() === studentId.toString());
             if (entry) {
                 totalSessions++;
@@ -231,12 +288,11 @@ export const getStudentAttendance = async (req, res) => {
                 historyList.push({
                     id: record._id,
                     date: record.sessionDate,
-                    subject: record.sessionSubject,
+                    subject: subj,
                     timeSlot: record.sessionTimeSlot,
                     status: entry.status
                 });
 
-                const subj = record.sessionSubject || 'General';
                 if (!courseMap[subj]) {
                     courseMap[subj] = { total: 0, attended: 0, present: 0, late: 0, absent: 0 };
                 }
@@ -257,7 +313,8 @@ export const getStudentAttendance = async (req, res) => {
             ? Math.round(((presentCount + lateCount) / totalSessions) * 100)
             : 100;
 
-        const ELIGIBILITY_THRESHOLD = 85;
+        const classGroup = await ClassGroup.findById(student.classId).lean();
+        const ELIGIBILITY_THRESHOLD = classGroup?.attendanceMinimumPercent || 85;
         const inGoodStanding = attendanceRate >= ELIGIBILITY_THRESHOLD;
 
         // Course breakdown
@@ -316,22 +373,47 @@ export const getStudentSchedule = async (req, res) => {
         const { weekStart } = req.query;
 
         const baseDate = weekStart ? new Date(weekStart) : new Date();
-        // Calculate Monday of the week
         const dayOfWeek = baseDate.getDay();
         const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
         const monday = new Date(baseDate);
         monday.setDate(baseDate.getDate() + diffToMonday);
         monday.setHours(0, 0, 0, 0);
 
+        const endOfWeek = new Date(monday);
+        endOfWeek.setDate(monday.getDate() + 7);
+
+        // Fetch real sessions if any exist
+        const realSessions = await ClassSession.find({
+            classId: student.classId,
+            date: { $gte: monday, $lt: endOfWeek },
+            status: { $ne: 'cancelled' }
+        })
+            .populate('teacherId', 'name')
+            .populate('courseId', 'name code')
+            .sort({ startTime: 1 })
+            .lean();
+
         const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
         const timetable = days.map((dayName, idx) => {
             const dayDate = new Date(monday);
             dayDate.setDate(monday.getDate() + idx);
+            const dateStr = dayDate.toISOString().slice(0, 10);
 
-            return {
-                day: dayName,
-                date: dayDate.toISOString().slice(0, 10),
-                slots: [
+            const daySessions = realSessions.filter(s => new Date(s.date).toISOString().slice(0, 10) === dateStr);
+
+            let slots = [];
+            if (daySessions.length > 0) {
+                slots = daySessions.map(s => ({
+                    id: s._id,
+                    time: `${s.startTime} - ${s.endTime}`,
+                    subject: s.courseId?.name || s.topic || "Class Session",
+                    teacher: s.teacherId?.name || "Teacher",
+                    room: s.room,
+                    mode: "in-person",
+                    type: s.type
+                }));
+            } else {
+                slots = [
                     {
                         time: "09:00 - 10:30 AM",
                         subject: idx % 2 === 0 ? "Mathematics" : "Physics",
@@ -353,7 +435,13 @@ export const getStudentSchedule = async (req, res) => {
                         room: "Online Portal",
                         mode: "online"
                     }
-                ]
+                ];
+            }
+
+            return {
+                day: dayName,
+                date: dateStr,
+                slots
             };
         });
 
@@ -385,27 +473,35 @@ export const getStudentCourses = async (req, res) => {
             })
             .lean();
 
-        const courses = enrollments.map(e => {
-            const course = e.courseId;
-            if (!course) return null;
-            const totalLessons = course.lessons ? course.lessons.length : 0;
-            const completedLessons = course.lessons
-                ? course.lessons.filter(l => l.status === 'completed').length
-                : 0;
+        const courses = enrollments
+            .filter(e => e.courseId && e.courseId.status !== 'archived')
+            .map(e => {
+                const course = e.courseId;
+                const totalLessons = course.lessons ? course.lessons.length : 0;
+                const completedLessons = course.lessons
+                    ? course.lessons.filter(l => l.status === 'completed').length
+                    : 0;
 
-            return {
-                id: course._id,
-                code: course.code,
-                name: course.name,
-                term: course.term,
-                teacherName: course.teacherId?.name || "Faculty Member",
-                credits: course.credits || 3,
-                description: course.description,
-                progressPercent: e.progressPercent || 0,
-                totalLessons,
-                completedLessons
-            };
-        }).filter(Boolean);
+                return {
+                    id: course._id,
+                    code: course.code,
+                    name: course.name,
+                    term: course.term,
+                    teacherName: course.teacherId?.name || "Faculty Member",
+                    credits: course.credits || 3,
+                    description: course.description,
+                    status: course.status || 'active',
+                    studentElementsVisibility: course.studentElementsVisibility || {
+                        attendanceSchedule: true,
+                        growthPerformance: true,
+                        examResults: true,
+                        learningResources: true
+                    },
+                    progressPercent: e.progressPercent || 0,
+                    totalLessons,
+                    completedLessons
+                };
+            });
 
         return res.status(200).json({
             message: "Enrolled courses fetched successfully",
@@ -439,12 +535,20 @@ export const getStudentCourseDetail = async (req, res) => {
             populate: { path: 'teacherId', select: 'name email' }
         }).lean();
 
-        if (!enrollment || !enrollment.courseId) {
+        if (!enrollment || !enrollment.courseId || enrollment.courseId.status === 'archived') {
             return res.status(404).json({ message: "Course not found or you are not enrolled in this course." });
         }
 
         const course = enrollment.courseId;
-        const lessons = (course.lessons || []).map((l, index) => {
+        const visibility = course.studentElementsVisibility || {
+            attendanceSchedule: true,
+            growthPerformance: true,
+            examResults: true,
+            learningResources: true
+        };
+
+        // If learningResources is toggled off, omit lessons list
+        const lessons = visibility.learningResources !== false ? (course.lessons || []).map((l, index) => {
             let status = l.status || 'not_started';
             if (index === 0 && status === 'not_started') status = 'completed';
             return {
@@ -453,7 +557,7 @@ export const getStudentCourseDetail = async (req, res) => {
                 order: l.order || index + 1,
                 status: status === 'not_started' && index === 1 ? 'in_progress' : (status === 'not_started' && index === 2 ? 'up_next' : status)
             };
-        });
+        }) : [];
 
         return res.status(200).json({
             message: "Course detail fetched successfully",
@@ -465,6 +569,8 @@ export const getStudentCourseDetail = async (req, res) => {
                 teacherName: course.teacherId?.name || "Faculty Member",
                 credits: course.credits,
                 description: course.description,
+                status: course.status,
+                studentElementsVisibility: visibility,
                 progressPercent: enrollment.progressPercent || 0,
                 lessons
             }
@@ -480,7 +586,7 @@ export const getStudentCourseDetail = async (req, res) => {
  * 6. GET /api/student/results?from=&to=
  * Performance-over-time trend with date range, percentile badge,
  * performance by subject, auto-generated insights, next best steps recommendations,
- * and exam results table with published results only
+ * and exam results table with published results only (respecting course toggles)
  */
 export const getStudentResults = async (req, res) => {
     try {
@@ -488,9 +594,28 @@ export const getStudentResults = async (req, res) => {
         const studentId = student._id;
         const { from, to } = req.query;
 
+        // Check visibility toggles across enrolled courses
+        const enrollments = await Enrollment.find({ studentId }).populate('courseId').lean();
+        const hiddenExamSubjects = new Set();
+        const hiddenGrowthSubjects = new Set();
+
+        enrollments.forEach(e => {
+            const c = e.courseId;
+            if (c) {
+                if (c.studentElementsVisibility?.examResults === false) {
+                    hiddenExamSubjects.add(c.name.toLowerCase());
+                    hiddenExamSubjects.add(c.code.toLowerCase());
+                }
+                if (c.studentElementsVisibility?.growthPerformance === false) {
+                    hiddenGrowthSubjects.add(c.name.toLowerCase());
+                    hiddenGrowthSubjects.add(c.code.toLowerCase());
+                }
+            }
+        });
+
         const performance = await calculateStudentPerformance(studentId);
 
-        // Fetch class metrics to derive rank and percentile badge
+        // Class metrics
         const classMetrics = await calculateClassMetrics(student.classId);
         const selfMetric = classMetrics.studentsMetrics.find(sm => sm.studentId.toString() === studentId.toString());
         const classRank = selfMetric ? selfMetric.classRank : 1;
@@ -513,6 +638,8 @@ export const getStudentResults = async (req, res) => {
         const trend = [];
 
         for (const a of assessments) {
+            if (hiddenGrowthSubjects.has(a.subject.toLowerCase())) continue;
+
             const classResults = await Result.find({ assessmentId: a._id }).lean();
             const studentResult = classResults.find(r => r.studentId.toString() === studentId.toString());
             const max = a.maxScore || 100;
@@ -534,8 +661,15 @@ export const getStudentResults = async (req, res) => {
             }
         }
 
-        // Performance by subject with auto-generated insight
-        const subjects = Object.entries(performance.subjectBreakdown);
+        // Performance by subject with auto-generated insight (filtered by exam visibility)
+        const filteredSubjectBreakdown = {};
+        for (const [subj, data] of Object.entries(performance.subjectBreakdown)) {
+            if (!hiddenExamSubjects.has(subj.toLowerCase())) {
+                filteredSubjectBreakdown[subj] = data;
+            }
+        }
+
+        const subjects = Object.entries(filteredSubjectBreakdown);
         let strongestSubject = null;
         let weakestSubject = null;
 
@@ -549,7 +683,7 @@ export const getStudentResults = async (req, res) => {
             ? `Strongest in ${strongestSubject.subject} (${strongestSubject.averagePercent}%). Needs most focus in ${weakestSubject.subject} (${weakestSubject.averagePercent}%).`
             : "Keep up your regular practice to establish subject benchmarks.";
 
-        // Rule-based "Next best steps" recommendations
+        // Recommendations
         const nextAssessment = await Assessment.findOne({
             classId: student.classId,
             date: { $gte: new Date() }
@@ -584,8 +718,10 @@ export const getStudentResults = async (req, res) => {
             suggestedAction: "Log Daily Activity"
         });
 
-        // Exam results table (only published results)
-        const examResultsTable = performance.resultsList.filter(r => r.status === 'published');
+        // Exam results table (only published and un-hidden results)
+        const examResultsTable = performance.resultsList.filter(
+            r => r.status === 'published' && !hiddenExamSubjects.has(r.subject.toLowerCase())
+        );
 
         return res.status(200).json({
             message: "Student results and learning analytics fetched successfully",
@@ -593,7 +729,7 @@ export const getStudentResults = async (req, res) => {
             classRank: `#${classRank}`,
             overallScorePercent: performance.overallScorePercent,
             performanceOverTime: trend,
-            performanceBySubject: performance.subjectBreakdown,
+            performanceBySubject: filteredSubjectBreakdown,
             insight: autoGeneratedInsight,
             recommendations,
             examResults: examResultsTable
@@ -647,12 +783,29 @@ export const getStudentAnnouncements = async (req, res) => {
 
 /**
  * 8. GET /api/student/resources?courseId=
- * Resources scoped to enrolled courses or class
+ * Resources scoped to enrolled courses or class (respecting learningResources visibility)
  */
 export const getStudentResources = async (req, res) => {
     try {
         const student = req.student;
         const { courseId } = req.query;
+
+        // Check visibility
+        const enrollments = await Enrollment.find({ studentId: student._id }).populate('courseId').lean();
+        const hiddenResourceCourseIds = new Set();
+        enrollments.forEach(e => {
+            const c = e.courseId;
+            if (c && c.studentElementsVisibility?.learningResources === false) {
+                hiddenResourceCourseIds.add(c._id.toString());
+            }
+        });
+
+        if (courseId && hiddenResourceCourseIds.has(courseId.toString())) {
+            return res.status(200).json({
+                message: "Resources for this course are currently hidden by administration",
+                resources: []
+            });
+        }
 
         const filter = {
             $or: [
@@ -662,9 +815,10 @@ export const getStudentResources = async (req, res) => {
         };
 
         if (!courseId) {
-            const enrollments = await Enrollment.find({ studentId: student._id }).select('courseId').lean();
-            const courseIds = enrollments.map(e => e.courseId);
-            filter.$or.push({ courseId: { $in: courseIds } });
+            const allowedCourseIds = enrollments
+                .map(e => e.courseId?._id)
+                .filter(cid => cid && !hiddenResourceCourseIds.has(cid.toString()));
+            filter.$or.push({ courseId: { $in: allowedCourseIds } });
         }
 
         const resources = await Resource.find(filter)
@@ -673,15 +827,17 @@ export const getStudentResources = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        const formatted = resources.map(r => ({
-            id: r._id,
-            title: r.title,
-            course: r.courseId ? `${r.courseId.code} - ${r.courseId.name}` : "General",
-            fileUrl: r.fileUrl,
-            link: r.link,
-            uploadedBy: r.uploadedBy?.name || "Teacher",
-            createdAt: r.createdAt
-        }));
+        const formatted = resources
+            .filter(r => !r.courseId || !hiddenResourceCourseIds.has(r.courseId._id.toString()))
+            .map(r => ({
+                id: r._id,
+                title: r.title,
+                course: r.courseId ? `${r.courseId.code} - ${r.courseId.name}` : "General",
+                fileUrl: r.fileUrl,
+                link: r.link,
+                uploadedBy: r.uploadedBy?.name || "Teacher",
+                createdAt: r.createdAt
+            }));
 
         return res.status(200).json({
             message: "Resources fetched successfully",

@@ -20,6 +20,10 @@ export const attendanceRecordSchema = new mongoose.Schema({
         required: true,
         index: true
     },
+    sessionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'ClassSession'
+    },
     sessionDate: {
         type: Date,
         required: true,
@@ -27,12 +31,10 @@ export const attendanceRecordSchema = new mongoose.Schema({
     },
     sessionSubject: {
         type: String,
-        required: true,
         trim: true
     },
     sessionTimeSlot: {
         type: String,
-        required: true,
         trim: true
     },
     entries: [attendanceEntrySchema],

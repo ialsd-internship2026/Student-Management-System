@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
 import 'dotenv/config';
 import User from '../models/user.model.js';
+import Teacher from '../models/teacher.model.js';
+import Admin from '../models/admin.model.js';
 import Student from '../models/student.model.js';
 import AttendanceRecord from '../models/attendanceRecord.model.js';
 
@@ -31,11 +33,22 @@ export const authTeacher = async (req, res, next) => {
             return res.status(403).json({ message: "Forbidden. Teacher privilege required." });
         }
 
-        // Fetch fresh user to have latest assignedClassIds if needed
-        const user = await User.findById(decoded.id).select('-passWord');
+        const user = await User.findById(decoded.id).select('-passwordHash');
         if (!user) {
             return res.status(401).json({ message: "User not found or deactivated." });
         }
+
+        // Soft delete check: deactivated teachers lose access
+        let teacher = null;
+        if (user.role === 'teacher') {
+            teacher = await Teacher.findOne({ userId: user._id });
+            if (teacher && teacher.active === false) {
+                return res.status(403).json({ message: "Forbidden: Teacher account has been deactivated." });
+            }
+        }
+
+        const teacherClasses = teacher ? (teacher.assignedClassIds || []) : (user.get('assignedClassIds') || decoded.assignedClassIds || []);
+        const teacherSubjects = teacher ? (teacher.subjects || []) : (user.get('subjects') || []);
 
         req.user = {
             id: user._id.toString(),
@@ -43,9 +56,12 @@ export const authTeacher = async (req, res, next) => {
             name: user.name,
             email: user.email,
             role: user.role,
-            assignedClassIds: (user.assignedClassIds || []).map(id => id.toString()),
-            subjects: user.subjects || []
+            active: user.active !== false && (!teacher || teacher.active !== false),
+            assignedClassIds: teacherClasses.map(id => id.toString()),
+            subjects: teacherSubjects,
+            teacherId: teacher ? teacher._id.toString() : null
         };
+        req.teacher = teacher;
 
         return next();
     } catch (error) {
@@ -127,7 +143,7 @@ export const verifyClassOwnership = async (req, res, next) => {
  * Student authentication middleware
  * Enforces role === 'student'
  * Derives studentId implicitly from JWT / User record
- * Rejects any client attempt to supply a different studentId
+ * Rejects archived students and client attempt to supply a different studentId
  */
 export const authStudent = async (req, res, next) => {
     try {
@@ -142,7 +158,7 @@ export const authStudent = async (req, res, next) => {
             return res.status(403).json({ message: "Forbidden. Student privilege required." });
         }
 
-        // Reject client param tampering attempts (acceptance criterion: no studentId param swapping)
+        // Reject client param tampering attempts
         if (req.params.studentId || req.query.studentId || req.body?.studentId) {
             const attemptedId = req.params.studentId || req.query.studentId || req.body?.studentId;
             const tokenStudentId = decoded.studentId ? decoded.studentId.toString() : null;
@@ -160,12 +176,16 @@ export const authStudent = async (req, res, next) => {
         }
 
         if (!student) {
-            // Attempt to find by userId
             student = await Student.findOne({ userId: decoded.id });
         }
 
         if (!student) {
             return res.status(403).json({ message: "Forbidden: No linked student profile found." });
+        }
+
+        // Soft delete check: archived students lose access
+        if (student.enrollmentStatus === 'archived') {
+            return res.status(403).json({ message: "Forbidden: Student enrollment is archived." });
         }
 
         req.user = decoded;
@@ -181,20 +201,47 @@ export const authStudent = async (req, res, next) => {
     }
 };
 
+/**
+ * Admin authentication middleware
+ * Enforces role === 'admin'
+ */
 export const authAdmin = async (req, res, next) => {
     try {
         const token = getTokenFromRequest(req);
         if (!token) {
-            return res.status(401).json({ message: "Unauthorized. Please log in to access this resource." });
+            return res.status(401).json({ message: "Unauthorized. Please log in as an administrator." });
         }
 
         const decoded = jwt.verify(token, process.env.JWT_PRIVATE || "default_jwt_secret");
 
         if (decoded.role !== 'admin') {
-            return res.status(403).json({ message: "Forbidden. Admin privilege required." });
+            return res.status(403).json({ message: "Forbidden. Administrator privilege required." });
         }
 
-        req.user = decoded;
+        const user = await User.findById(decoded.id).select('-passwordHash');
+        if (!user) {
+            return res.status(401).json({ message: "Administrator account not found." });
+        }
+
+        if (user.active === false) {
+            return res.status(403).json({ message: "Forbidden: Administrator account has been deactivated." });
+        }
+
+        let admin = await Admin.findOne({ userId: user._id });
+        if (admin && admin.active === false) {
+            return res.status(403).json({ message: "Forbidden: Administrator account has been deactivated." });
+        }
+
+        req.user = {
+            id: user._id.toString(),
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            adminId: admin ? admin._id.toString() : null
+        };
+        req.admin = admin;
+
         return next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {

@@ -47,6 +47,29 @@ export const courseSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    status: {
+        type: String,
+        enum: ['active', 'draft', 'archived'],
+        default: 'active'
+    },
+    studentElementsVisibility: {
+        attendanceSchedule: {
+            type: Boolean,
+            default: true
+        },
+        growthPerformance: {
+            type: Boolean,
+            default: true
+        },
+        examResults: {
+            type: Boolean,
+            default: true
+        },
+        learningResources: {
+            type: Boolean,
+            default: true
+        }
+    },
     lessons: [lessonSchema]
 }, {
     timestamps: true

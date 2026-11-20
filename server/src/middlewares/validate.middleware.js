@@ -11,9 +11,16 @@ export const validateRequest = (req, res, next) => {
 };
 
 export const validationRules = [
-    body('userName').isString().withMessage("Username must be a string").isLength({ min: 3, max: 20 }).withMessage("Username must be between 3 and 20 characters long"),
+    body('name').isString().withMessage("Name must be a string").trim().isLength({ min: 2, max: 100 }).withMessage("Name must be between 2 and 100 characters long"),
     body('email').isEmail().withMessage("Invalid email address"),
-    body('passWord').isLength({ min: 6 }).withMessage("Password must contain at least 6 characters"),
+    body('password').custom((value, { req }) => {
+        const pw = value || req.body.passwordHash || req.body.passWord;
+        if (!pw || pw.length < 6) {
+            throw new Error("Password must contain at least 6 characters");
+        }
+        return true;
+    }),
+    body('role').optional().isIn(['teacher', 'student', 'admin']).withMessage("Role must be 'teacher', 'student', or 'admin'"),
 
     validateRequest
 ];

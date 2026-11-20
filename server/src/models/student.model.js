@@ -17,7 +17,6 @@ export const studentSchema = new mongoose.Schema({
     classId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'ClassGroup',
-        required: [true, 'ClassId is required'],
         index: true
     },
     enrolledSubjects: [{
@@ -29,10 +28,16 @@ export const studentSchema = new mongoose.Schema({
         ref: 'User',
         sparse: true
     },
-    avatar: {
+    enrollmentStatus: {
         type: String,
-        trim: true
-    }
+        enum: ['pending', 'enrolled', 'archived'],
+        default: 'enrolled',
+        index: true
+    },
+    enrollmentDate: {
+        type: Date,
+        default: Date.now
+    },
 }, {
     timestamps: true,
     toJSON: { virtuals: true },

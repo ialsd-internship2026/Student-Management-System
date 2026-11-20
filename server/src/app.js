@@ -3,17 +3,11 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import helmet from 'helmet';
 import mongoose from 'mongoose';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 import authRoutes from './routes/auth.routes.js';
 import teacherRoutes from './routes/teacher.routes.js';
 import studentRoutes from './routes/student.routes.js';
 import adminRoutes from './routes/admin.routes.js';
-
-// ES Module __dirname configuration
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -56,7 +50,6 @@ app.use(cookieParser());
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
     const dbState = mongoose.connection.readyState;
-
     const dbStatusMap = {
         0: 'Disconnected',
         1: 'Connected',
@@ -73,17 +66,14 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Static Uploads Folder
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
 // API Routes
 app.use('/api/auth', authRoutes);
 
 app.use('/api/teacher', teacherRoutes);
-app.use('/api/teachers', teacherRoutes);
+app.use('/api/teachers', teacherRoutes); // alias
 
 app.use('/api/student', studentRoutes);
-app.use('/api/students', studentRoutes);
+app.use('/api/students', studentRoutes); // alias
 
 app.use('/api/admin', adminRoutes);
 
@@ -97,7 +87,6 @@ app.use((req, res) => {
 // Global Error Handling Middleware
 app.use((err, req, res, next) => {
     console.error('[Global Error Handler]', err);
-
     res.status(err.status || 500).json({
         message: err.message || 'An unexpected error occurred on the server.',
         error: process.env.NODE_ENV === 'development' ? err : undefined
