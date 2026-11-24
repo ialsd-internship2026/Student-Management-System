@@ -1,0 +1,4 @@
+/**
+ * Attendance Feature Types
+ */
+export {};

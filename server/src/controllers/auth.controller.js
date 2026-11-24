@@ -253,13 +253,24 @@ export const login = async (req, res) => {
             });
         }
 
-        const currentPasswordHash = user.passwordHash || user.get('passWord');
+        const currentPasswordHash = user.passwordHash || user._doc?.passWord || user.get('passWord');
+        if (!currentPasswordHash) {
+            return res.status(401).json({
+                message: "No password found on account. Please contact administrator."
+            });
+        }
         const isValidPassword = await bcrypt.compare(finalPassword, currentPasswordHash);
 
         if (!isValidPassword) {
             return res.status(401).json({
                 message: "Invalid password. Please try again."
             });
+        }
+
+        // Auto-migrate legacy document to passwordHash if needed
+        if (!user.passwordHash && currentPasswordHash) {
+            user.passwordHash = currentPasswordHash;
+            await user.save().catch(() => {});
         }
 
         let assignedClassIds = [];

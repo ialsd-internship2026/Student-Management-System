@@ -1,14 +1,18 @@
 # Dependencies
 node_modules/
 */node_modules/
+client/node_modules/
+server/node_modules/
 
 # Environment variables & secrets
 .env
 .env.*
+*.env
+**/.env
+**/.env.*
 !.env.example
-server/.env
-server/.env.*
 !server/.env.example
+!client/.env.example
 
 # Logs
 *.log
@@ -26,6 +30,23 @@ Thumbs.db
 tmp/
 temp/
 dist/
+client/dist/
 
 # Uploaded files
 server/uploads/*
+
+# Windows batch launchers
+*.bat
+
+# Agent & workspace metadata
+.agent/
+.agents/
+.gemini/
+.gsd/
+.planning/
+GSD-STYLE.md
+PROJECT_RULES.md
+VERSION
+adapters/
+model_capabilities.yaml
+scripts/

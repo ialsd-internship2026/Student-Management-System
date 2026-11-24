@@ -37,7 +37,7 @@ export const userSchema = new mongoose.Schema({
 
 // Backward compatibility virtual for passWord field if previously saved
 userSchema.virtual('passWord').get(function () {
-    return this.passwordHash;
+    return this.passwordHash || this._doc?.passWord;
 }).set(function (val) {
     this.passwordHash = val;
 });

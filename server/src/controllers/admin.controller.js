@@ -124,7 +124,7 @@ export const getAdminOverview = async (req, res) => {
 
         // 1. Institute-wide counts
         const [activeStudentCount, activeTeacherCount, totalClassesCount, pendingEnrollmentsCount] = await Promise.all([
-            Student.countDocuments({ enrollmentStatus: 'enrolled' }),
+            Student.countDocuments({ enrollmentStatus: { $ne: 'archived' } }),
             Teacher.countDocuments({ active: true }).then(async count => count > 0 ? count : User.countDocuments({ role: 'teacher', active: true })),
             ClassGroup.countDocuments({}),
             Student.countDocuments({ enrollmentStatus: 'pending' })

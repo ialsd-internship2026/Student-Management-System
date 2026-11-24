@@ -1,0 +1,4 @@
+/**
+ * Schedule Feature Types
+ */
+export {};
