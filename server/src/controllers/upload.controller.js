@@ -1,11 +1,11 @@
 import mongoose from 'mongoose';
-import imagekit, { publicKey, urlEndpoint } from '../config/imagekit.js';
+import ImageKitService from '../services/imagekit.service.js';
 import Setting from '../models/setting.model.js';
 
 /**
- * Upload single image (supports multipart file via multer or base64 data string)
+ * Upload single image (delegates core uploading to ImageKitService)
  */
-export async function uploadImage(req, res, next) {
+export async function uploadImage(req, res) {
     try {
         let filePayload = null;
         let originalName = 'upload';
@@ -25,32 +25,17 @@ export async function uploadImage(req, res, next) {
             });
         }
 
-        // Clean folder name
-        const rawFolder = req.body?.folder || req.query?.folder || 'general';
-        const folder = rawFolder.startsWith('/') ? `/aster_portal${rawFolder}` : `/aster_portal/${rawFolder}`;
+        const folderCategory = req.body?.folder || req.query?.folder || 'general';
 
-        const extMatch = originalName.match(/\.[a-zA-Z0-9]+$/);
-        const ext = extMatch ? extMatch[0] : '.jpg';
-        const baseName = originalName.replace(/\.[a-zA-Z0-9]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
-        const fileName = `${baseName}_${Date.now()}${ext}`;
-
-        const uploadResponse = await imagekit.files.upload({
-            file: filePayload,
-            fileName,
-            folder,
-            useUniqueFileName: true
-        });
+        const uploadResult = await ImageKitService.uploadImage(filePayload, originalName, folderCategory);
 
         return res.status(200).json({
             success: true,
             message: 'Image uploaded successfully to ImageKit cloud',
-            url: uploadResponse.url,
-            fileId: uploadResponse.fileId,
-            name: uploadResponse.name,
-            thumbnailUrl: uploadResponse.thumbnailUrl || uploadResponse.url
+            ...uploadResult
         });
     } catch (error) {
-        console.error('[ImageKit Upload Error]:', error);
+        console.error('[Image Upload Controller Error]:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Failed to upload image to ImageKit cloud.'
@@ -63,15 +48,11 @@ export async function uploadImage(req, res, next) {
  */
 export async function getAuthParams(req, res) {
     try {
-        const authenticationParameters = imagekit.helper?.getAuthenticationParameters
-            ? imagekit.helper.getAuthenticationParameters()
-            : null;
+        const authData = ImageKitService.getAuthParameters();
 
         return res.status(200).json({
             success: true,
-            publicKey,
-            urlEndpoint,
-            auth: authenticationParameters
+            ...authData
         });
     } catch (error) {
         console.error('[ImageKit Auth Error]:', error);
@@ -136,3 +117,10 @@ export async function updateLandingSettings(req, res) {
         });
     }
 }
+
+export default {
+    uploadImage,
+    getAuthParams,
+    getLandingSettings,
+    updateLandingSettings
+};
