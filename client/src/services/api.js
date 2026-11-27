@@ -78,7 +78,41 @@ export const authAPI = {
   login: (email, password) => post('/auth/login', { email, password }),
   register: (userData) => post('/auth/register', userData),
   logout: () => post('/auth/logout', {}),
-  me: () => get('/auth/me')
+  me: () => get('/auth/me'),
+  updateProfile: (data) => put('/auth/me', data)
+};
+
+// =========================================================================
+// UPLOAD & CLOUD STORAGE API (IMAGEKIT)
+// =========================================================================
+export const uploadAPI = {
+  uploadFile: async (file, folder = 'profiles') => {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('folder', folder);
+
+    const token = getToken();
+    const res = await fetch(`${BASE_URL}/upload/image`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: formData,
+      credentials: 'include'
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.message || 'ImageKit upload failed');
+    }
+    return data;
+  },
+
+  uploadBase64: (fileBase64, fileName, folder = 'profiles') =>
+    post('/upload/base64', { file: fileBase64, fileName, folder }),
+
+  getLandingSettings: () => get('/upload/landing'),
+  updateLandingSettings: (settings) => put('/upload/landing', settings)
 };
 
 // =========================================================================

@@ -25,6 +25,11 @@ export const userSchema = new mongoose.Schema({
         default: 'student',
         index: true
     },
+    photo: {
+        type: String,
+        default: '',
+        trim: true
+    },
     active: {
         type: Boolean,
         default: true
@@ -40,6 +45,13 @@ userSchema.virtual('passWord').get(function () {
     return this.passwordHash || this._doc?.passWord;
 }).set(function (val) {
     this.passwordHash = val;
+});
+
+// Avatar virtual alias for photo
+userSchema.virtual('avatar').get(function () {
+    return this.photo;
+}).set(function (val) {
+    this.photo = val;
 });
 
 export const userModel = mongoose.models.User || mongoose.model('User', userSchema);

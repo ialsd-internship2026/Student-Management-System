@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { LogIn, Eye, EyeOff, AlertCircle, GraduationCap, ShieldCheck } from 'lucide-react';
 
-export default function LoginForm({ onLogin }) {
+export default function LoginForm({ onLogin, branding }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -33,17 +33,37 @@ export default function LoginForm({ onLogin }) {
     setError('');
   };
 
+  const wrapperStyle = branding?.heroImageUrl
+    ? {
+        ...styles.wrapper,
+        backgroundImage: `linear-gradient(rgba(15, 23, 42, 0.72), rgba(30, 27, 75, 0.8)), url("${branding.heroImageUrl}")`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }
+    : styles.wrapper;
+
+  const brandDisplayName = branding?.name || 'Aster';
+  const brandDisplayTagline = branding?.tagline || 'Institute';
+
   return (
-    <div style={styles.wrapper}>
+    <div style={wrapperStyle}>
       <div style={styles.card}>
         {/* Brand header */}
         <div style={styles.brandRow}>
           <div style={styles.brandIcon}>
-            <GraduationCap size={28} color="#ffffff" />
+            {branding?.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt="Logo"
+                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }}
+              />
+            ) : (
+              <GraduationCap size={28} color="#ffffff" />
+            )}
           </div>
           <div>
-            <h1 style={styles.brandTitle}>Aster Institute</h1>
-            <p style={styles.brandSubtitle}>Student Management System</p>
+            <h1 style={styles.brandTitle}>{brandDisplayName}</h1>
+            <p style={styles.brandSubtitle}>{brandDisplayTagline} · Portal</p>
           </div>
         </div>
 

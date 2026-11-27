@@ -21,6 +21,11 @@ export const adminSchema = new mongoose.Schema({
         lowercase: true,
         index: true
     },
+    photo: {
+        type: String,
+        default: '',
+        trim: true
+    },
     department: {
         type: String,
         default: 'Administration',
@@ -40,6 +45,12 @@ export const adminSchema = new mongoose.Schema({
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
+});
+
+adminSchema.virtual('avatar').get(function () {
+    return this.photo;
+}).set(function (val) {
+    this.photo = val;
 });
 
 export const adminModel = mongoose.models.Admin || mongoose.model('Admin', adminSchema);

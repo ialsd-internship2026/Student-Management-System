@@ -21,6 +21,11 @@ export const teacherSchema = new mongoose.Schema({
         lowercase: true,
         index: true
     },
+    photo: {
+        type: String,
+        default: '',
+        trim: true
+    },
     subjects: [{
         type: String,
         trim: true
@@ -38,6 +43,12 @@ export const teacherSchema = new mongoose.Schema({
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
+});
+
+teacherSchema.virtual('avatar').get(function () {
+    return this.photo;
+}).set(function (val) {
+    this.photo = val;
 });
 
 export const teacherModel = mongoose.models.Teacher || mongoose.model('Teacher', teacherSchema);

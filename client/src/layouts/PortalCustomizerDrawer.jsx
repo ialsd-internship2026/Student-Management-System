@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   X,
   Palette,
@@ -10,11 +10,12 @@ import {
   User,
   Sliders,
   Download,
-  Upload,
-  BookOpen,
   GraduationCap,
-  Compass
+  Compass,
+  Cloud
 } from 'lucide-react';
+import PhotoUploader from '../components/common/PhotoUploader';
+import { uploadAPI } from '../services/api';
 
 export default function PortalCustomizerDrawer({
   isOpen,
@@ -118,6 +119,78 @@ export default function PortalCustomizerDrawer({
                 onChange={(e) => onUpdateBranding({ ...branding, tagline: e.target.value })}
                 placeholder="e.g. INSTITUTE or HIGH SCHOOL"
               />
+            </div>
+
+            {/* Cloud Image Uploads via ImageKit */}
+            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-light)' }}>
+              <PhotoUploader
+                photo={branding.logoUrl || ''}
+                onPhotoChange={(newUrl) => onUpdateBranding({ ...branding, logoUrl: newUrl })}
+                initials={branding.name ? branding.name[0].toUpperCase() : 'A'}
+                label="Institute Brand Logo (ImageKit Cloud)"
+                idPrefix="brand-logo"
+                folder="branding"
+              />
+            </div>
+
+            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border-light)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <label className="field-label" style={{ margin: 0 }}>Landing Page Hero Image / Banner (Cloud)</label>
+                {branding.heroImageUrl && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#059669', fontWeight: 600 }}>
+                    <Cloud size={12} /> ImageKit
+                  </span>
+                )}
+              </div>
+
+              {branding.heroImageUrl ? (
+                <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)', marginBottom: '8px' }}>
+                  <img
+                    src={branding.heroImageUrl}
+                    alt="Landing Hero Banner"
+                    style={{ width: '100%', height: '110px', objectFit: 'cover' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onUpdateBranding({ ...branding, heroImageUrl: '' })}
+                    className="btn btn-danger btn-sm"
+                    style={{ position: 'absolute', top: '6px', right: '6px', padding: '3px 8px', fontSize: '11px' }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : null}
+
+              <PhotoUploader
+                photo={branding.heroImageUrl || ''}
+                onPhotoChange={(newUrl) => onUpdateBranding({ ...branding, heroImageUrl: newUrl })}
+                initials="LP"
+                label="Upload New Landing Page Banner"
+                idPrefix="landing-hero"
+                folder="landing"
+              />
+
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ width: '100%', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                onClick={async () => {
+                  try {
+                    await uploadAPI.updateLandingSettings({
+                      name: branding.name,
+                      tagline: branding.tagline,
+                      logoUrl: branding.logoUrl,
+                      heroImageUrl: branding.heroImageUrl
+                    });
+                    showToast('Saved branding & landing images to cloud database.');
+                  } catch (err) {
+                    showToast(err.message || 'Failed to save to cloud.');
+                  }
+                }}
+              >
+                <Cloud size={14} />
+                <span>Save Branding & Landing to Cloud</span>
+              </button>
             </div>
           </div>
 

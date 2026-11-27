@@ -430,6 +430,67 @@ export const getMe = async (req, res) => {
     }
 };
 
+export const updateMe = async (req, res) => {
+    try {
+        const userId = req.user.id || req.user._id;
+        const { name, photo, department, subjects } = req.body;
+
+        const updateFields = {};
+        if (name) updateFields.name = name;
+        if (photo !== undefined) updateFields.photo = photo;
+
+        const updatedUser = await userModel.findByIdAndUpdate(
+            userId,
+            { $set: updateFields },
+            { new: true, runValidators: true }
+        ).select('-passwordHash');
+
+        if (!updatedUser) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        let updatedProfile = null;
+        if (updatedUser.role === 'teacher') {
+            const teacherUpdates = {};
+            if (name) teacherUpdates.name = name;
+            if (photo !== undefined) teacherUpdates.photo = photo;
+            if (subjects) teacherUpdates.subjects = subjects;
+            updatedProfile = await teacherModel.findOneAndUpdate(
+                { userId: updatedUser._id },
+                { $set: teacherUpdates },
+                { new: true }
+            ).populate('assignedClassIds', 'name term');
+        } else if (updatedUser.role === 'admin') {
+            const adminUpdates = {};
+            if (name) adminUpdates.name = name;
+            if (photo !== undefined) adminUpdates.photo = photo;
+            if (department) adminUpdates.department = department;
+            updatedProfile = await adminModel.findOneAndUpdate(
+                { userId: updatedUser._id },
+                { $set: adminUpdates },
+                { new: true }
+            );
+        } else if (updatedUser.role === 'student') {
+            const studentUpdates = {};
+            if (name) studentUpdates.name = name;
+            if (photo !== undefined) studentUpdates.photo = photo;
+            updatedProfile = await studentModel.findOneAndUpdate(
+                { userId: updatedUser._id },
+                { $set: studentUpdates },
+                { new: true }
+            ).populate('classId', 'name term');
+        }
+
+        return res.status(200).json({
+            message: "Profile updated successfully",
+            user: updatedUser,
+            profile: updatedProfile
+        });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+};
+
 export const registerUser = register;
 export const loginUser = login;
 export const logoutUser = logout;
@@ -439,6 +500,7 @@ export default {
     login,
     logout,
     getMe,
+    updateMe,
     registerUser,
     loginUser,
     logoutUser

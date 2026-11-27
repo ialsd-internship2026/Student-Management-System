@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.routes.js';
 import teacherRoutes from './routes/teacher.routes.js';
 import studentRoutes from './routes/student.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import uploadRoutes from './routes/upload.routes.js';
 
 const app = express();
 
@@ -76,6 +77,8 @@ app.use('/api/student', studentRoutes);
 app.use('/api/students', studentRoutes); // alias
 
 app.use('/api/admin', adminRoutes);
+
+app.use('/api/upload', uploadRoutes);
 
 // Catch-all for undefined routes
 app.use((req, res) => {

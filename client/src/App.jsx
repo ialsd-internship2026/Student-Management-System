@@ -21,7 +21,7 @@ import PortalCustomizerDrawer from './layouts/PortalCustomizerDrawer';
 
 // Auth & Services
 import { useAuth } from './context/AuthContext';
-import { adminAPI, teacherAPI } from './services/api';
+import { adminAPI, teacherAPI, uploadAPI, authAPI } from './services/api';
 import { transformCourse, transformSection, transformStudent, transformTeacher } from './utils/transformers';
 
 export default function App() {
@@ -41,7 +41,23 @@ export default function App() {
   };
 
   // Branding state
-  const [branding, setBranding] = useState({ name: 'aster', tagline: 'INSTITUTE' });
+  const [branding, setBranding] = useState({
+    name: 'aster',
+    tagline: 'INSTITUTE',
+    logoUrl: '',
+    heroImageUrl: ''
+  });
+
+  // Load cloud branding and landing settings on mount
+  useEffect(() => {
+    uploadAPI.getLandingSettings()
+      .then(res => {
+        if (res?.data) {
+          setBranding(prev => ({ ...prev, ...res.data }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Workspace: 'admin' | 'teacher'
   const [workspace, setWorkspace] = useState('admin');
@@ -140,7 +156,7 @@ export default function App() {
     role: user?.role === 'admin' ? `${profile?.department || 'Institute'} Administrator` : 'Institute Administrator',
     email: user?.role === 'admin' ? user?.email : 'admin@aster.edu',
     initials: (user?.role === 'admin' && user?.name) ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'AO',
-    photo: `https://ui-avatars.com/api/?name=${encodeURIComponent((user?.role === 'admin' && user?.name) ? user.name : 'Admin')}&background=4f46e5&color=fff&size=256`
+    photo: (user?.role === 'admin' && (user?.photo || profile?.photo)) ? (user.photo || profile.photo) : `https://ui-avatars.com/api/?name=${encodeURIComponent((user?.role === 'admin' && user?.name) ? user.name : 'Admin')}&background=4f46e5&color=fff&size=256`
   };
 
   const teacherUser = {
@@ -150,7 +166,7 @@ export default function App() {
     assignedClass: (user?.role === 'teacher' && profile?.assignedClassIds?.[0]?.name) || (sections[0]?.name || 'Grade 10-A'),
     email: user?.role === 'teacher' ? user?.email : 'teacher@aster.edu',
     initials: (user?.role === 'teacher' && user?.name) ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'SJ',
-    photo: `https://ui-avatars.com/api/?name=${encodeURIComponent((user?.role === 'teacher' && user?.name) ? user.name : 'Faculty')}&background=7c3aed&color=fff&size=256`
+    photo: (user?.role === 'teacher' && (user?.photo || profile?.photo)) ? (user.photo || profile.photo) : (teachers[0]?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent((user?.role === 'teacher' && user?.name) ? user.name : 'Faculty')}&background=7c3aed&color=fff&size=256`)
   };
 
   // Modals state
@@ -250,8 +266,18 @@ export default function App() {
     });
   };
 
-  const handleSaveProfile = (newProfile) => {
-    showToast(`Profile updated to ${newProfile.name}`);
+  const handleSaveProfile = async (newProfile) => {
+    try {
+      await authAPI.updateProfile({
+        name: newProfile.name,
+        photo: newProfile.photo,
+        department: newProfile.department
+      });
+      showToast(`Profile updated to ${newProfile.name}`);
+      loadBackendData();
+    } catch (err) {
+      showToast(err.message || 'Profile saved locally.');
+    }
   };
 
   // Switch workspace
@@ -359,7 +385,7 @@ export default function App() {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage onLogin={login} />;
+    return <LoginPage onLogin={login} branding={branding} />;
   }
 
   return (

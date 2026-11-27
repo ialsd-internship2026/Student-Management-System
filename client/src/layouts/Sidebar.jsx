@@ -92,12 +92,20 @@ export default function Sidebar({
               title={isEditSession ? 'Click to customize institute name & tagline' : ''}
             >
               <div className="brand-icon">
-                <svg viewBox="0 0 24 24" fill="none" className="aster-star">
-                  <path
-                    d="M12 2L14.2 8.5L20.5 10.5L14.2 12.5L12 19L9.8 12.5L3.5 10.5L9.8 8.5L12 2Z"
-                    fill="white"
+                {branding?.logoUrl ? (
+                  <img
+                    src={branding.logoUrl}
+                    alt="Logo"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
                   />
-                </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" className="aster-star">
+                    <path
+                      d="M12 2L14.2 8.5L20.5 10.5L14.2 12.5L12 19L9.8 12.5L3.5 10.5L9.8 8.5L12 2Z"
+                      fill="white"
+                    />
+                  </svg>
+                )}
               </div>
               <div className="brand-text">
                 <span className="brand-name">{branding.name}</span>

@@ -14,6 +14,11 @@ export const studentSchema = new mongoose.Schema({
         uppercase: true,
         index: true
     },
+    photo: {
+        type: String,
+        default: '',
+        trim: true
+    },
     classId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'ClassGroup',
@@ -46,6 +51,12 @@ export const studentSchema = new mongoose.Schema({
 
 studentSchema.virtual('rollNumber').get(function () {
     return this.studentCode;
+});
+
+studentSchema.virtual('avatar').get(function () {
+    return this.photo;
+}).set(function (val) {
+    this.photo = val;
 });
 
 export const studentModel = mongoose.models.Student || mongoose.model('Student', studentSchema);
